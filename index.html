@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Carte OSM - Cercle 20 km</title>
+  <title>Carte OSM - Cercle au clic</title>
 
   <link
     rel="stylesheet"
@@ -30,28 +30,36 @@
     const lat = 47.31198396824485;
     const lon = -1.496901079245638;
 
-    const map = L.map('map');
+    const map = L.map('map').setView([lat, lon], 12);
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
+    let circle = null;
+
     // Marqueur
-    L.marker([lat, lon]).addTo(map)
+    const marker = L.marker([lat, lon]).addTo(map)
       .bindPopup(`<b>Point</b><br>${lat}, ${lon}`);
 
-    // Cercle 20 km avec style visible
-    const circle = L.circle([lat, lon], {
-      radius: 20000,
-      color: 'red',
-      weight: 2,
-      fillColor: 'red',
-      fillOpacity: 0.15
-    }).addTo(map);
+    // Au clic sur le point
+    marker.on('click', function () {
+      if (circle) {
+        map.removeLayer(circle);
+        circle = null;
+      } else {
+        circle = L.circle([lat, lon], {
+          radius: 20000,
+          color: 'red',
+          weight: 2,
+          fillColor: 'red',
+          fillOpacity: 0.15
+        }).addTo(map);
 
-    // Ajuste la vue pour voir tout le cercle
-    map.fitBounds(circle.getBounds());
+        map.fitBounds(circle.getBounds());
+      }
+    });
   </script>
 </body>
 </html>

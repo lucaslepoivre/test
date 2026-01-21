@@ -3,12 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Carte OSM - Cercle au clic</title>
+  <title>Carte OSM - TEST</title>
 
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""
   />
 
@@ -20,34 +19,23 @@
 <body>
   <div id="map"></div>
 
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // Coordonnées
     const lat = 47.31198396824485;
     const lon = -1.496901079245638;
 
-    // Crée la carte + vue initiale
     const map = L.map('map').setView([lat, lon], 12);
 
-    // Tuiles OSM
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Force Leaflet à recalculer la taille (utile si chargement/iframe)
-    setTimeout(() => map.invalidateSize(), 0);
-
-    // Marqueur
+    // Popup avec juste "TEST"
     const marker = L.marker([lat, lon]).addTo(map)
-      .bindPopup(`<b>Point</b><br>${lat}, ${lon}`);
+      .bindPopup(`<h3>TEST</h3>`);
 
-    // Cercle (créé/supprimé au clic)
     let circle = null;
 
     marker.on('click', () => {
@@ -56,14 +44,13 @@
         circle = null;
       } else {
         circle = L.circle([lat, lon], {
-          radius: 20000,       // 20 km
+          radius: 20000,
           color: 'red',
           weight: 2,
           fillColor: 'red',
           fillOpacity: 0.15
         }).addTo(map);
 
-        // Zoom pour voir tout le cercle
         map.fitBounds(circle.getBounds());
       }
     });

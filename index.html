@@ -2,10 +2,8 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Carte OSM - Points depuis Google Sheets</title>
-
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <title>Carte OSM - Points depuis Sheet</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100vh; width: 100vw; }
@@ -13,54 +11,39 @@
 </head>
 <body>
   <div id="map"></div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // 1) Carte
-    const map = L.map('map').setView([47.31198396824485, -1.496901079245638], 10);
+    const map = L.map('map').setView([47.3, -1.5], 9);
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // 2) URL CSV de ta feuille (lecture publique)
-    // Astuce: /gviz/tq?tqx=out:csv&sheet=... évite d'avoir à "Publier sur le web"
-    const SHEET_ID = "1CdSkcvdqIJ5xgkdVxBO-71bgtEiYjaEHq23ejyUxITU";
-    const SHEET_NAME = "ACC"; // d'après ton fichier
-    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+    const CSV_URL = "URL_CSV_ICI"; // lien "pub?output=csv"
 
-    // 3) Mini parseur CSV (supporte les champs entre guillemets)
-    function parseCSV(text) {
-      const rows = [];
-      let row = [];
-      let cur = "";
-      let inQuotes = false;
-
-      for (let i = 0; i < text.length; i++) {
-        const ch = text[i];
-        const next = text[i + 1];
-
-        if (ch === '"' && inQuotes && next === '"') { // échappement ""
-          cur += '"';
-          i++;
-        } else if (ch === '"') {
-          inQuotes = !inQuotes;
-        } else if (ch === ',' && !inQuotes) {
-          row.push(cur);
-          cur = "";
-        } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
-          if (ch === '\r' && next === '\n') i++;
-          row.push(cur);
-          cur = "";
-          // ignore lignes vides
-          if (row.some(cell => cell.trim() !== "")) rows.push(row);
-          row = [];
-        } else {
-          cur += ch;
+    fetch(CSV_URL)
+      .then(r => r.text())
+      .then(text => {
+        const lines = text.trim().split("\n");
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(",");
+          const coord = cols[1]; // colonne B
+          if (!coord) continue;
+          const parts = coord.split(";");
+          const ll = coord.split(",");
+          if (ll.length < 2) continue;
+          const lat = parseFloat(ll[0]);
+          const lon = parseFloat(ll[1]);
+          if (!isNaN(lat) && !isNaN(lon)) {
+            L.marker([lat, lon]).addTo(map).bindPopup("TEST");
+          }
         }
-      }
-      // dernier champ
-      row.push(cur);
-
+      })
+      .catch(e => {
+        alert("Erreur chargement Google Sheet");
+        console.error(e);
+      });
+  </script>
+</body>
+</html>

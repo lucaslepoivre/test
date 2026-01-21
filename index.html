@@ -27,36 +27,43 @@
   ></script>
 
   <script>
+    // Coordonnées
     const lat = 47.31198396824485;
     const lon = -1.496901079245638;
 
+    // Crée la carte + vue initiale
     const map = L.map('map').setView([lat, lon], 12);
 
+    // Tuiles OSM
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    let circle = null;
+    // Force Leaflet à recalculer la taille (utile si chargement/iframe)
+    setTimeout(() => map.invalidateSize(), 0);
 
     // Marqueur
     const marker = L.marker([lat, lon]).addTo(map)
       .bindPopup(`<b>Point</b><br>${lat}, ${lon}`);
 
-    // Au clic sur le point
-    marker.on('click', function () {
+    // Cercle (créé/supprimé au clic)
+    let circle = null;
+
+    marker.on('click', () => {
       if (circle) {
         map.removeLayer(circle);
         circle = null;
       } else {
         circle = L.circle([lat, lon], {
-          radius: 20000,
+          radius: 20000,       // 20 km
           color: 'red',
           weight: 2,
           fillColor: 'red',
           fillOpacity: 0.15
         }).addTo(map);
 
+        // Zoom pour voir tout le cercle
         map.fitBounds(circle.getBounds());
       }
     });

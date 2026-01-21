@@ -2,8 +2,11 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>Carte OSM - Points depuis Sheet</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Carte OSM - Plusieurs points</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100vh; width: 100vw; }
@@ -11,39 +14,62 @@
 </head>
 <body>
   <div id="map"></div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <script>
-    const map = L.map('map').setView([47.3, -1.5], 9);
+    const map = L.map('map').setView([47.18, -1.42], 11);
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    const CSV_URL = "URL_CSV_ICI"; // lien "pub?output=csv"
+    // Liste de tes points
+    const points = [
+      [47.194285,-1.423073],
+      [47.194285,-1.423073],
+      [47.185983,-1.443629],
+      [47.168604,-1.437149],
+      [47.168604,-1.437149],
+      [47.182145,-1.417429],
+      [47.161925,-1.408482],
+      [47.194832,-1.342392],
+      [47.125479,-1.420670],
+      [47.139500,-1.338272]
+    ];
 
-    fetch(CSV_URL)
-      .then(r => r.text())
-      .then(text => {
-        const lines = text.trim().split("\n");
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(",");
-          const coord = cols[1]; // colonne B
-          if (!coord) continue;
-          const parts = coord.split(";");
-          const ll = coord.split(",");
-          if (ll.length < 2) continue;
-          const lat = parseFloat(ll[0]);
-          const lon = parseFloat(ll[1]);
-          if (!isNaN(lat) && !isNaN(lon)) {
-            L.marker([lat, lon]).addTo(map).bindPopup("TEST");
-          }
+    const markers = [];
+
+    points.forEach(([lat, lon]) => {
+      const marker = L.marker([lat, lon]).addTo(map);
+      marker.bindPopup("<h3>TEST</h3>");
+
+      let circle = null;
+
+      marker.on('click', () => {
+        if (circle) {
+          map.removeLayer(circle);
+          circle = null;
+        } else {
+          circle = L.circle([lat, lon], {
+            radius: 20000,
+            color: 'red',
+            weight: 2,
+            fillColor: 'red',
+            fillOpacity: 0.15
+          }).addTo(map);
+
+          map.fitBounds(circle.getBounds());
         }
-      })
-      .catch(e => {
-        alert("Erreur chargement Google Sheet");
-        console.error(e);
       });
+
+      markers.push(marker);
+    });
+
+    // Ajuste la vue pour voir tous les points au départ
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.2));
   </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Carte OSM - Points + Cercle</title>
+  <title>Carte OSM - Rayon selon type</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -25,27 +25,24 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Tes points
+    // Points avec type a ou b
     const points = [
-      [47.194285,-1.423073],
-      [47.194285,-1.423073],
-      [47.185983,-1.443629],
-      [47.168604,-1.437149],
-      [47.168604,-1.437149],
-      [47.182145,-1.417429],
-      [47.161925,-1.408482],
-      [47.194832,-1.342392],
-      [47.125479,-1.420670],
-      [47.139500,-1.338272],
-      [47.080113, -0.92646]
+      { lat:47.194285, lon:-1.423073, type:"a" },
+      { lat:47.194285, lon:-1.423073, type:"b" },
+      { lat:47.185983, lon:-1.443629, type:"a" },
+      { lat:47.168604, lon:-1.437149, type:"b" },
+      { lat:47.168604, lon:-1.437149, type:"a" },
+      { lat:47.182145, lon:-1.417429, type:"b" },
+      { lat:47.161925, lon:-1.408482, type:"a" },
+      { lat:47.194832, lon:-1.342392, type:"b" },
+      { lat:47.125479, lon:-1.420670, type:"a" },
+      { lat:47.139500, lon:-1.338272, type:"b" }
     ];
 
     const markers = [];
     let activeCircle = null;
 
-    // Icônes
     const defaultIcon = new L.Icon.Default();
-
     const greenIcon = new L.Icon({
       iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
       shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
@@ -55,38 +52,37 @@
       shadowSize: [41,41]
     });
 
-    // Distance en mètres (haversine)
+    // Distance haversine en mètres
     function distance(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const toRad = d => d * Math.PI / 180;
       const dLat = toRad(lat2-lat1);
       const dLon = toRad(lon2-lon1);
       const a =
-        Math.sin(dLat/2)*Math.sin(dLat/2) +
+        Math.sin(dLat/2)**2 +
         Math.cos(toRad(lat1))*Math.cos(toRad(lat2)) *
-        Math.sin(dLon/2)*Math.sin(dLon/2);
+        Math.sin(dLon/2)**2;
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       return R * c;
     }
 
-    // Création des marqueurs
-    points.forEach(([lat, lon]) => {
-      const marker = L.marker([lat, lon]).addTo(map);
-      marker.bindPopup("<h3>TEST</h3>");
+    points.forEach(p => {
+      const marker = L.marker([p.lat, p.lon]).addTo(map);
+      marker.bindPopup(`<h3>TEST (${p.type})</h3>`);
 
       marker.on("click", () => {
         // Supprimer ancien cercle
-        if (activeCircle) {
-          map.removeLayer(activeCircle);
-          activeCircle = null;
-        }
+        if (activeCircle) map.removeLayer(activeCircle);
 
-        // Remettre tous les marqueurs par défaut
+        // Reset icônes
         markers.forEach(m => m.setIcon(defaultIcon));
 
+        // Rayon selon type
+        const radius = (p.type === "a") ? 10000 : 20000;
+
         // Nouveau cercle
-        activeCircle = L.circle([lat, lon], {
-          radius: 20000,
+        activeCircle = L.circle([p.lat, p.lon], {
+          radius: radius,
           color: "red",
           weight: 2,
           fillColor: "red",
@@ -97,9 +93,9 @@
 
         // Mettre en vert les points dans le cercle
         markers.forEach(m => {
-          const p = m.getLatLng();
-          const d = distance(lat, lon, p.lat, p.lng);
-          if (d <= 20000) {
+          const ll = m.getLatLng();
+          const d = distance(p.lat, p.lon, ll.lat, ll.lng);
+          if (d <= radius) {
             m.setIcon(greenIcon);
           }
         });
@@ -108,10 +104,9 @@
       markers.push(marker);
     });
 
-    // Vue initiale sur tous les points
+    // Vue initiale
     const group = L.featureGroup(markers);
     map.fitBounds(group.getBounds().pad(0.2));
   </script>
 </body>
 </html>
-

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Carte OSM - Cercle 20 km</title>
 
-  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -21,7 +20,6 @@
 <body>
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -32,10 +30,8 @@
     const lat = 47.31198396824485;
     const lon = -1.496901079245638;
 
-    // Crée la carte
-    const map = L.map('map').setView([lat, lon], 11);
+    const map = L.map('map');
 
-    // Fond de carte OpenStreetMap
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
@@ -43,13 +39,19 @@
 
     // Marqueur
     L.marker([lat, lon]).addTo(map)
-      .bindPopup(`<b>Point</b><br>${lat}, ${lon}`)
-      .openPopup();
+      .bindPopup(`<b>Point</b><br>${lat}, ${lon}`);
 
-    // Cercle de 20 km (20000 mètres)
-    L.circle([lat, lon], {
-      radius: 20000
+    // Cercle 20 km avec style visible
+    const circle = L.circle([lat, lon], {
+      radius: 20000,
+      color: 'red',
+      weight: 2,
+      fillColor: 'red',
+      fillOpacity: 0.15
     }).addTo(map);
+
+    // Ajuste la vue pour voir tout le cercle
+    map.fitBounds(circle.getBounds());
   </script>
 </body>
 </html>

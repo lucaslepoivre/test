@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Carte OSM - Rayon selon type</title>
+  <title>Carte OSM - Groupes (10/20 km)</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -25,7 +25,7 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Points avec type a ou b
+    // --- Données : points + type (a=10km, b=20km)
     const points = [
       { lat:47.194285, lon:-1.423073, type:"a" },
       { lat:47.194285, lon:-1.423073, type:"b" },
@@ -36,30 +36,135 @@
       { lat:47.161925, lon:-1.408482, type:"a" },
       { lat:47.194832, lon:-1.342392, type:"b" },
       { lat:47.125479, lon:-1.420670, type:"a" },
-      { lat:47.139500, lon:-1.338272, type:"b" },
-      { lat:47.175564, lon:-0.462275, type:"b" }
+      { lat:47.139500, lon:-1.338272, type:"b" }
     ];
 
-    const markers = [];
-    let activeCircle = null;
+    // --- Réglages
+    const RADIUS_BY_TYPE = { a: 10000, b: 20000 }; // en mètres
 
-    const defaultIcon = new L.Icon.Default();
-    const greenIcon = new L.Icon({
-      iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      iconSize: [25,41],
-      iconAnchor: [12,41],
-      popupAnchor: [1,-34],
-      shadowSize: [41,41]
-    });
+    // Taille visuelle des bulles (pixels) : adapte si tu veux
+    const MIN_BUBBLE_PX = 10;
+    const MAX_BUBBLE_PX = 45;
 
-    // Distance haversine en mètres
-    function distance(lat1, lon1, lat2, lon2) {
+    // --- Haversine distance (m)
+    function distanceMeters(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const toRad = d => d * Math.PI / 180;
       const dLat = toRad(lat2-lat1);
       const dLon = toRad(lon2-lon1);
       const a =
+        Math.sin(dLat/2)**2 +
+        Math.cos(toRad(lat1))*Math.cos(toRad(lat2)) *
+        Math.sin(dLon/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // --- Centre (moyenne lat/lon) d'un groupe
+    function computeCenter(members) {
+      const n = members.length;
+      let sumLat = 0, sumLon = 0;
+      for (const p of members) { sumLat += p.lat; sumLon += p.lon; }
+      return { lat: sumLat / n, lon: sumLon / n };
+    }
+
+    // --- Construction des groupes (greedy)
+    // Règle : on groupe par TYPE (a avec a, b avec b) pour respecter le rayon associé au type.
+    function buildGroups(points) {
+      const groups = []; // { type, members:[...], center:{lat,lon} }
+
+      for (const p of points) {
+        const type = p.type;
+        const radius = RADIUS_BY_TYPE[type];
+
+        // cherche un groupe existant (même type) dont le centre est à moins du rayon
+        let found = null;
+        for (const g of groups) {
+          if (g.type !== type) continue;
+          const d = distanceMeters(p.lat, p.lon, g.center.lat, g.center.lon);
+          if (d <= radius) { found = g; break; }
+        }
+
+        if (!found) {
+          const g = { type, members: [p], center: { lat: p.lat, lon: p.lon } };
+          groups.push(g);
+        } else {
+          found.members.push(p);
+          found.center = computeCenter(found.members);
+        }
+      }
+
+      return groups;
+    }
+
+    // --- Affiche les points (petits marqueurs)
+    const pointMarkers = [];
+    for (const p of points) {
+      const m = L.circleMarker([p.lat, p.lon], {
+        radius: 4,
+        weight: 1,
+        fillOpacity: 0.8
+      }).addTo(map);
+      m.bindPopup(`TEST (${p.type})`);
+      pointMarkers.push(m);
+    }
+
+    // --- Crée les bulles de groupes
+    const groups = buildGroups(points);
+    const counts = groups.map(g => g.members.length);
+    const maxCount = Math.max(...counts, 1);
+
+    // convertit un "count" en taille en pixels (proportionnel)
+    function bubblePx(count) {
+      // proportionnel à sqrt(count) = plus lisible visuellement
+      const t = Math.sqrt(count) / Math.sqrt(maxCount);
+      return MIN_BUBBLE_PX + t * (MAX_BUBBLE_PX - MIN_BUBBLE_PX);
+    }
+
+    // couche des bulles
+    const bubbleLayer = L.layerGroup().addTo(map);
+
+    groups.forEach((g, idx) => {
+      const count = g.members.length;
+      const px = bubblePx(count);
+
+      // Bulle (cercle marker en pixels) au centre du groupe
+      const bubble = L.circleMarker([g.center.lat, g.center.lon], {
+        radius: px,
+        weight: 2,
+        fillOpacity: 0.25
+      }).addTo(bubbleLayer);
+
+      // Popup avec nombre
+      bubble.bindPopup(
+        `<b>Groupe ${idx+1}</b><br>` +
+        `Type: ${g.type} (${RADIUS_BY_TYPE[g.type]/1000} km)<br>` +
+        `Points: ${count}`
+      );
+
+      // Option : dessiner aussi le rayon réel (10km/20km) quand on clique la bulle
+      let realCircle = null;
+      bubble.on("click", () => {
+        if (realCircle) {
+          map.removeLayer(realCircle);
+          realCircle = null;
+        } else {
+          realCircle = L.circle([g.center.lat, g.center.lon], {
+            radius: RADIUS_BY_TYPE[g.type],
+            weight: 2,
+            fillOpacity: 0.08
+          }).addTo(map);
+          map.fitBounds(realCircle.getBounds());
+        }
+      });
+    });
+
+    // Vue initiale sur tout
+    const all = L.featureGroup([...pointMarkers, bubbleLayer]);
+    map.fitBounds(all.getBounds().pad(0.2));
+  </script>
+</body>
+</html>
         Math.sin(dLat/2)**2 +
         Math.cos(toRad(lat1))*Math.cos(toRad(lat2)) *
         Math.sin(dLon/2)**2;

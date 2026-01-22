@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Carte OSM - Airtable</title>
+  <title>Carte OSM - Rayon selon type</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -13,94 +13,100 @@
   </style>
 </head>
 <body>
-<div id="map"></div>
+  <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script>
-  const map = L.map('map').setView([47.18, -1.42], 11);
+  <script>
+    const map = L.map('map').setView([47.18, -1.42], 11);
 
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-  const markers = [];
-  let activeCircle = null;
+    // Points avec type a ou b
+    const points = [
+      { lat:47.194285, lon:-1.423073, type:"a" },
+      { lat:47.194285, lon:-1.423073, type:"b" },
+      { lat:47.185983, lon:-1.443629, type:"a" },
+      { lat:47.168604, lon:-1.437149, type:"b" },
+      { lat:47.168604, lon:-1.437149, type:"a" },
+      { lat:47.182145, lon:-1.417429, type:"b" },
+      { lat:47.161925, lon:-1.408482, type:"a" },
+      { lat:47.194832, lon:-1.342392, type:"b" },
+      { lat:47.125479, lon:-1.420670, type:"a" },
+      { lat:47.139500, lon:-1.338272, type:"b" }
+    ];
 
-  const defaultIcon = new L.Icon.Default();
-  const greenIcon = new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [25,41],
-    iconAnchor: [12,41],
-    popupAnchor: [1,-34],
-    shadowSize: [41,41]
-  });
+    const markers = [];
+    let activeCircle = null;
 
-  function distance(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const toRad = d => d * Math.PI / 180;
-    const dLat = toRad(lat2-lat1);
-    const dLon = toRad(lon2-lon1);
-    const a =
-      Math.sin(dLat/2)**2 +
-      Math.cos(toRad(lat1))*Math.cos(toRad(lat2)) *
-      Math.sin(dLon/2)**2;
-    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }
-
-  // 🔗 URL CSV de la vue Airtable
-  const AIRTABLE_CSV_URL = https://airtable.com/appYb4hbKbJIOR4VH/shrMHnAg32xw7fYqT;
-
-  fetch(AIRTABLE_CSV_URL)
-    .then(r => r.text())
-    .then(csv => {
-      const lines = csv.trim().split("\n");
-      const headers = lines[0].split(",");
-
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(",");
-
-        const lat = parseFloat(cols[headers.indexOf("lat")]);
-        const lon = parseFloat(cols[headers.indexOf("lon")]);
-        const type = cols[headers.indexOf("type")];
-
-        if (isNaN(lat) || isNaN(lon)) continue;
-
-        const marker = L.marker([lat, lon]).addTo(map);
-        marker.bindPopup(`<h3>TEST (${type})</h3>`);
-
-        marker.on("click", () => {
-          if (activeCircle) map.removeLayer(activeCircle);
-
-          markers.forEach(m => m.setIcon(defaultIcon));
-
-          const radius = (type === "a") ? 10000 : 20000;
-
-          activeCircle = L.circle([lat, lon], {
-            radius,
-            color: "red",
-            weight: 2,
-            fillOpacity: 0.15
-          }).addTo(map);
-
-          map.fitBounds(activeCircle.getBounds());
-
-          markers.forEach(m => {
-            const ll = m.getLatLng();
-            if (distance(lat, lon, ll.lat, ll.lng) <= radius) {
-              m.setIcon(greenIcon);
-            }
-          });
-        });
-
-        markers.push(marker);
-      }
-
-      const group = L.featureGroup(markers);
-      map.fitBounds(group.getBounds().pad(0.2));
+    const defaultIcon = new L.Icon.Default();
+    const greenIcon = new L.Icon({
+      iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      iconSize: [25,41],
+      iconAnchor: [12,41],
+      popupAnchor: [1,-34],
+      shadowSize: [41,41]
     });
-</script>
+
+    // Distance haversine en mètres
+    function distance(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2-lat1);
+      const dLon = toRad(lon2-lon1);
+      const a =
+        Math.sin(dLat/2)**2 +
+        Math.cos(toRad(lat1))*Math.cos(toRad(lat2)) *
+        Math.sin(dLon/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    points.forEach(p => {
+      const marker = L.marker([p.lat, p.lon]).addTo(map);
+      marker.bindPopup(`<h3>TEST (${p.type})</h3>`);
+
+      marker.on("click", () => {
+        // Supprimer ancien cercle
+        if (activeCircle) map.removeLayer(activeCircle);
+
+        // Reset icônes
+        markers.forEach(m => m.setIcon(defaultIcon));
+
+        // Rayon selon type
+        const radius = (p.type === "a") ? 10000 : 20000;
+
+        // Nouveau cercle
+        activeCircle = L.circle([p.lat, p.lon], {
+          radius: radius,
+          color: "red",
+          weight: 2,
+          fillColor: "red",
+          fillOpacity: 0.15
+        }).addTo(map);
+
+        map.fitBounds(activeCircle.getBounds());
+
+        // Mettre en vert les points dans le cercle
+        markers.forEach(m => {
+          const ll = m.getLatLng();
+          const d = distance(p.lat, p.lon, ll.lat, ll.lng);
+          if (d <= radius) {
+            m.setIcon(greenIcon);
+          }
+        });
+      });
+
+      markers.push(marker);
+    });
+
+    // Vue initiale
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.2));
+  </script>
 </body>
 </html>

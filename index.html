@@ -3,13 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Carte OSM - Rayon selon type</title>
+  <title>Carte OSM - Clusters + panneau</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+
   <style>
     html, body { height: 100%; margin: 0; }
-    /* On laisse de la place au panneau */
     #map { height: 100vh; width: 100vw; }
 
     /* Panneau latéral */
@@ -81,6 +84,11 @@
     /* État fermé */
     .sidebar-hidden #sidebar { display: none; }
     .sidebar-hidden #toggleSidebar { right: 12px; }
+
+    /* Cluster look (optionnel : rend les cercles plus “bulle”) */
+    .marker-cluster div {
+      border-radius: 999px !important;
+    }
   </style>
 </head>
 <body>
@@ -95,6 +103,9 @@
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet MarkerCluster JS -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
   <script>
     const map = L.map('map').setView([47.18, -1.42], 11);
@@ -118,19 +129,6 @@
       { lat:47.139500, lon:-1.338272, type:"b" }
     ];
 
-    const markers = []; // on stocke { marker, data }
-    let activeCircle = null;
-
-    const defaultIcon = new L.Icon.Default();
-    const greenIcon = new L.Icon({
-      iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      iconSize: [25,41],
-      iconAnchor: [12,41],
-      popupAnchor: [1,-34],
-      shadowSize: [41,41]
-    });
-
     // Sidebar elements
     const sidebarMeta = document.getElementById("sidebarMeta");
     const sidebarList = document.getElementById("sidebarList");
@@ -142,6 +140,19 @@
       toggleBtn.textContent = document.body.classList.contains("sidebar-hidden")
         ? "Afficher la liste"
         : "Masquer la liste";
+      // Important: Leaflet doit recalculer la taille si on change l’UI
+      setTimeout(() => map.invalidateSize(), 0);
+    });
+
+    // Icônes
+    const defaultIcon = new L.Icon.Default();
+    const greenIcon = new L.Icon({
+      iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      iconSize: [25,41],
+      iconAnchor: [12,41],
+      popupAnchor: [1,-34],
+      shadowSize: [41,41]
     });
 
     // Distance haversine en mètres
@@ -182,7 +193,6 @@
           <div class="small">${item.data.lat.toFixed(6)}, ${item.data.lon.toFixed(6)} · ${Math.round(item.d)} m</div>
         `;
 
-        // Au clic sur l’item : zoom + ouvre popup
         li.addEventListener("click", () => {
           map.setView([item.data.lat, item.data.lon], 14);
           item.marker.openPopup();
@@ -192,23 +202,50 @@
       });
     }
 
+    let activeCircle = null;
+
+    // --- CLUSTER LAYER (bulles avec nombre au dézoom)
+    const clusters = L.markerClusterGroup({
+      // Optionnel: personnaliser l’icône du cluster
+      iconCreateFunction: function (cluster) {
+        const count = cluster.getChildCount();
+        // petite / moyenne / grande classe (MarkerCluster.Default.css s’en sert)
+        let c = ' marker-cluster-';
+        if (count < 10) c += 'small';
+        else if (count < 50) c += 'medium';
+        else c += 'large';
+
+        return L.divIcon({
+          html: `<div><span>${count}</span></div>`,
+          className: 'marker-cluster' + c,
+          iconSize: L.point(40, 40)
+        });
+      }
+    });
+
+    // On garde tout en mémoire pour calculer “dans le cercle”
+    const markerObjects = []; // { marker, data }
+
     points.forEach(p => {
-      const marker = L.marker([p.lat, p.lon]).addTo(map);
+      const marker = L.marker([p.lat, p.lon], { icon: defaultIcon });
       marker.bindPopup(`<h3>TEST (${p.type})</h3>`);
 
       marker.on("click", () => {
         // Supprimer ancien cercle
-        if (activeCircle) map.removeLayer(activeCircle);
+        if (activeCircle) {
+          map.removeLayer(activeCircle);
+          activeCircle = null;
+        }
 
         // Reset icônes
-        markers.forEach(o => o.marker.setIcon(defaultIcon));
+        markerObjects.forEach(o => o.marker.setIcon(defaultIcon));
 
         // Rayon selon type
         const radius = (p.type === "a") ? 10000 : 20000;
 
         // Nouveau cercle
         activeCircle = L.circle([p.lat, p.lon], {
-          radius: radius,
+          radius,
           color: "red",
           weight: 2,
           fillColor: "red",
@@ -217,9 +254,9 @@
 
         map.fitBounds(activeCircle.getBounds());
 
-        // Trouver points dans le cercle + mettre en vert
+        // Mettre en vert + remplir la liste
         const inside = [];
-        markers.forEach(o => {
+        markerObjects.forEach(o => {
           const ll = o.marker.getLatLng();
           const d = distance(p.lat, p.lon, ll.lat, ll.lng);
           if (d <= radius) {
@@ -228,19 +265,31 @@
           }
         });
 
-        // Tri par distance
         inside.sort((a, b) => a.d - b.d);
-
-        // Panneau latéral
         renderSidebar(p, radius, inside);
       });
 
-      markers.push({ marker, data: p });
+      clusters.addLayer(marker);
+      markerObjects.push({ marker, data: p });
     });
 
-    // Vue initiale
-    const group = L.featureGroup(markers.map(o => o.marker));
+    map.addLayer(clusters);
+
+    // Vue initiale sur tout
+    const group = L.featureGroup(markerObjects.map(o => o.marker));
     map.fitBounds(group.getBounds().pad(0.2));
+
+    // Optionnel : si on clique sur la carte (pas un marker), on enlève le cercle + reset
+    map.on('click', (e) => {
+      // ignore si c’est un clic sur un cluster/marker (Leaflet gère mais on reste safe)
+      if (activeCircle) {
+        map.removeLayer(activeCircle);
+        activeCircle = null;
+        markerObjects.forEach(o => o.marker.setIcon(defaultIcon));
+        sidebarMeta.textContent = "Clique sur un point pour afficher la liste.";
+        sidebarList.innerHTML = "";
+      }
+    });
   </script>
 </body>
 </html>
